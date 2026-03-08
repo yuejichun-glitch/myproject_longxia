@@ -1,0 +1,235 @@
+﻿﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌾 农产品 AI 文案生成器</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .row {
+            display: flex;
+            gap: 16px;
+        }
+        .row > div {
+            flex: 1;
+        }
+        button {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .result {
+            white-space: pre-wrap;
+            line-height: 1.8;
+            color: #333;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        .loading::after {
+            content: '...';
+            animation: dots 1s infinite;
+        }
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+        .model-status {
+            text-align: center;
+            padding: 8px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌾 农产品 AI 文案生成器</h1>
+            <p>帮农户卖货，让农产品走进千家万户</p>
+        </div>
+        
+        <div class="card">
+            <div class="model-status" id="modelStatus">检查本地模型...</div>
+            
+            <div class="form-group">
+                <label>📦 产品名称</label>
+                <input type="text" id="productName" placeholder="如：赣南脐橙、烟台苹果">
+            </div>
+            
+            <div class="row">
+                <div class="form-group">
+                    <label>🏷️ 产品类型</label>
+                    <select id="productType">
+                        <option value="">选择类型</option>
+                        {% for type, products in product_types.items() %}
+                        <optgroup label="{{ type }}">
+                            {% for product in products %}
+                            <option value="{{ product }}">{{ product }}</option>
+                            {% endfor %}
+                        </optgroup>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>🎭 风格</label>
+                    <select id="tone">
+                        <option value="热情">热情</option>
+                        <option value="朴实">朴实</option>
+                        <option value="专业">专业</option>
+                        <option value="幽默">幽默</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>📱 平台</label>
+                <select id="platform">
+                    <option value="抖音">抖音</option>
+                    <option value="快手">快手</option>
+                    <option value="视频号">视频号</option>
+                    <option value="小红书">小红书</option>
+                </select>
+            </div>
+            
+            <button onclick="generate()" id="generateBtn">🚀 一键生成文案</button>
+        </div>
+        
+        <div class="card" id="resultCard" style="display: none;">
+            <label>📝 生成结果</label>
+            <div class="result" id="result"></div>
+        </div>
+    </div>
+    
+    <script>
+        // 检查模型
+        fetch('/api/models')
+            .then(r => r.json())
+            .then(data => {
+                const status = document.getElementById('modelStatus');
+                if (data.models && data.models.length > 0) {
+                    status.innerHTML = '✅ 本地模型已就绪：' + data.models.join(', ');
+                } else {
+                    status.innerHTML = '⚠️ 未检测到本地模型，请先安装 Ollama';
+                }
+            })
+            .catch(() => {
+                document.getElementById('modelStatus').innerHTML = '❌ 无法连接 Ollama 服务';
+            });
+        
+        function generate() {
+            const productName = document.getElementById('productName').value.trim();
+            const productType = document.getElementById('productType').value;
+            const tone = document.getElementById('tone').value;
+            const platform = document.getElementById('platform').value;
+            
+            if (!productName && !productType) {
+                alert('请输入产品名称或选择产品类型');
+                return;
+            }
+            
+            const btn = document.getElementById('generateBtn');
+            const resultCard = document.getElementById('resultCard');
+            const result = document.getElementById('result');
+            
+            btn.disabled = true;
+            btn.textContent = '生成中...';
+            resultCard.style.display = 'block';
+            result.innerHTML = '<div class="loading">AI 正在创作</div>';
+            
+            fetch('/api/generate', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    product_name: productName,
+                    product_type: productType || productName,
+                    tone: tone,
+                    platform: platform
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                result.textContent = data.result || '生成失败，请重试';
+            })
+            .catch(err => {
+                result.textContent = 'Error: ' + err.message;
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = '🚀 一键生成文案';
+            });
+        }
+    </script>
+</body>
+</html>
