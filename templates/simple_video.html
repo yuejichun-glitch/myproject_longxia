@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎬 图文转视频 - 农产品推广</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; padding: 20px;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        .header { text-align: center; color: white; margin-bottom: 30px; }
+        .header h1 { font-size: 2rem; margin-bottom: 10px; }
+        .card {
+            background: white; border-radius: 16px; padding: 24px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2); margin-bottom: 20px;
+        }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: 600; margin-bottom: 8px; color: #333; }
+        input, textarea, select {
+            width: 100%; padding: 12px; border: 2px solid #e0e0e0;
+            border-radius: 8px; font-size: 16px;
+        }
+        input:focus, textarea:focus { outline: none; border-color: #667eea; }
+        .image-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 15px 0;
+        }
+        .image-grid img {
+            width: 100%; height: 100px; object-fit: cover; border-radius: 8px;
+            border: 2px solid #eee;
+        }
+        button {
+            width: 100%; padding: 16px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; border: none; border-radius: 8px; font-size: 18px;
+            font-weight: 600; cursor: pointer; margin-bottom: 10px;
+        }
+        button:hover { transform: translateY(-2px); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        
+        /* 视频预览区 */
+        .video-preview {
+            position: relative;
+            width: 100%;
+            max-width: 480px;
+            margin: 20px auto;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .video-preview img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .video-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.8));
+            padding: 20px;
+            color: white;
+        }
+        .video-overlay h3 {
+            font-size: 18px;
+            margin-bottom: 8px;
+        }
+        .video-overlay p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 4px;
+            background: #667eea;
+            transition: width 0.1s linear;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .controls button {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 农产品短视频生成器</h1>
+            <p>上传图片 + 文案 = 自动生成带货视频</p>
+        </div>
+        
+        <div class="card">
+            <div class="form-group">
+                <label>🖼️ 上传商品图片</label>
+                <input type="file" id="imageFiles" multiple accept="image/*">
+                <div class="image-grid" id="imagePreview"></div>
+            </div>
+            
+            <div class="form-group">
+                <label>📝 配音文案（每句一行）</label>
+                <textarea id="scriptText" rows="6" placeholder="欢迎来到直播间！
+今天给大家推荐我们家乡的赣南脐橙
+皮薄肉厚，汁多味甜
+现摘现发，保证新鲜"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label>⏱️ 每张图展示时长（秒）</label>
+                <select id="duration">
+                    <option value="3">3秒</option>
+                    <option value="5" selected>5秒</option>
+                    <option value="8">8秒</option>
+                    <option value="10">10秒</option>
+                </select>
+            </div>
+            
+            <button onclick="generateVideo()" id="generateBtn">🎬 预览视频</button>
+        </div>
+        
+        <div class="card" id="resultCard" style="display: none;">
+            <label>📺 视频预览</label>
+            <div class="video-preview" id="videoPreview">
+                <img id="previewImg" src="" alt="">
+                <div class="video-overlay">
+                    <h3 id="overlayTitle"></h3>
+                    <p id="overlayText"></p>
+                </div>
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            
+            <div class="controls">
+                <button onclick="playVideo()" id="playBtn">▶️ 播放/暂停</button>
+                <button onclick="downloadVideo()" id="downloadBtn">⬇️ 下载视频</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let images = [];
+        let currentIndex = 0;
+        let isPlaying = false;
+        let progressInterval;
+        let scriptLines = [];
+        
+        // 图片预览
+        document.getElementById('imageFiles').addEventListener('change', function(e) {
+            const preview = document.getElementById('imagePreview');
+            preview.innerHTML = '';
+            images = [];
+            
+            Array.from(e.target.files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    images.push(evt.target.result);
+                    const img = document.createElement('img');
+                    img.src = evt.target.result;
+                    preview.appendChild(img);
+                };
+                reader.readAsDataURL(file);
+            });
+        });
+        
+        function generateVideo() {
+            if (images.length === 0) {
+                alert('请上传图片');
+                return;
+            }
+            
+            // 分割文案
+            scriptLines = document.getElementById('scriptText').value.split('\n').filter(s => s.trim());
+            
+            document.getElementById('resultCard').style.display = 'block';
+            currentIndex = 0;
+            showImage();
+        }
+        
+        function showImage() {
+            if (!isPlaying && currentIndex === 0) {
+                document.getElementById('previewImg').src = images[0];
+                document.getElementById('overlayText').textContent = scriptLines[0] || '点击播放开始';
+                return;
+            }
+            
+            document.getElementById('previewImg').src = images[currentIndex];
+            document.getElementById('overlayText').textContent = scriptLines[currentIndex] || '';
+            
+            // 语音合成
+            if (scriptLines[currentIndex] && 'speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(scriptLines[currentIndex]);
+                utterance.lang = 'zh-CN';
+                speechSynthesis.speak(utterance);
+            }
+            
+            // 进度条
+            const duration = parseInt(document.getElementById('duration').value) * 1000;
+            const startTime = Date.now();
+            
+            if (progressInterval) clearInterval(progressInterval);
+            
+            progressInterval = setInterval(() => {
+                const elapsed = Date.now() - startTime;
+                const progress = (elapsed / duration) * 100;
+                document.getElementById('progressBar').style.width = progress + '%';
+                
+                if (elapsed >= duration) {
+                    clearInterval(progressInterval);
+                    nextImage();
+                }
+            }, 100);
+        }
+        
+        function nextImage() {
+            currentIndex = (currentIndex + 1) % images.length;
+            if (isPlaying) showImage();
+        }
+        
+        function playVideo() {
+            isPlaying = !isPlaying;
+            document.getElementById('playBtn').textContent = isPlaying ? '⏸️ 暂停' : '▶️ 播放';
+            
+            if (isPlaying) {
+                showImage();
+            } else {
+                if (progressInterval) clearInterval(progressInterval);
+                speechSynthesis.cancel();
+            }
+        }
+        
+        function downloadVideo() {
+            alert('视频下载功能开发中...\n\n可以先截图保存当前帧');
+        }
+    </script>
+</body>
+</html>

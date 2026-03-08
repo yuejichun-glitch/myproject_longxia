@@ -41,6 +41,10 @@ def call_ollama(prompt, model="qwen2.5-coder:7b"):
 def index():
     return render_template("index.html", product_types=PRODUCT_TYPES)
 
+@app.route("/video")
+def video():
+    return render_template("simple_video.html")
+
 @app.route("/api/generate", methods=["POST"])
 def generate():
     data = request.json

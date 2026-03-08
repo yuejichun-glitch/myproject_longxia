@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎬 图文转视频 - 农产品推广</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            min-height: 100vh; padding: 20px;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        .header { text-align: center; color: white; margin-bottom: 30px; }
+        .header h1 { font-size: 2rem; margin-bottom: 10px; }
+        .card {
+            background: white; border-radius: 16px; padding: 24px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2); margin-bottom: 20px;
+        }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: 600; margin-bottom: 8px; color: #333; }
+        input, textarea, select {
+            width: 100%; padding: 12px; border: 2px solid #e0e0e0;
+            border-radius: 8px; font-size: 16px;
+        }
+        input:focus, textarea:focus { outline: none; border-color: #11998e; }
+        .image-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 15px 0;
+        }
+        .image-grid img {
+            width: 100%; height: 100px; object-fit: cover; border-radius: 8px;
+            border: 2px solid #eee;
+        }
+        button {
+            width: 100%; padding: 16px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white; border: none; border-radius: 8px; font-size: 18px;
+            font-weight: 600; cursor: pointer; margin-bottom: 10px;
+        }
+        button:hover { transform: translateY(-2px); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .result { white-space: pre-wrap; line-height: 1.8; color: #333; }
+        .video-preview video { width: 100%; border-radius: 8px; margin-top: 15px; }
+        .loading { text-align: center; padding: 20px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 农产品 AI 图文转视频</h1>
+            <p>一键生成带货短视频</p>
+        </div>
+        
+        <div class="card">
+            <div class="form-group">
+                <label>🌐 从网址提取图片（可选）</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="urlInput" placeholder="输入商品页URL">
+                    <button onclick="extractImages()" style="width: auto; padding: 12px 24px;">提取</button>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>🖼️ 商品图片（点击选择）</label>
+                <input type="file" id="imageFiles" multiple accept="image/*">
+                <div class="image-grid" id="imagePreview"></div>
+            </div>
+            
+            <div class="form-group">
+                <label>📝 配音文案</label>
+                <textarea id="scriptText" rows="4" placeholder="输入配音文案..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label>⏱️ 每张图展示时长（秒）</label>
+                <select id="duration">
+                    <option value="3">3秒</option>
+                    <option value="5" selected>5秒</option>
+                    <option value="8">8秒</option>
+                    <option value="10">10秒</option>
+                </select>
+            </div>
+            
+            <button onclick="generateVideo()" id="generateBtn">🎬 生成视频</button>
+        </div>
+        
+        <div class="card" id="resultCard" style="display: none;">
+            <label>📺 视频预览</label>
+            <div class="video-preview" id="videoPreview"></div>
+        </div>
+    </div>
+    
+    <script>
+        // 图片预览
+        document.getElementById('imageFiles').addEventListener('change', function(e) {
+            const preview = document.getElementById('imagePreview');
+            preview.innerHTML = '';
+            Array.from(e.target.files).forEach(file => {
+                const img = document.createElement('img');
+                img.src = URL.createObjectURL(file);
+                preview.appendChild(img);
+            });
+        });
+        
+        // 提取图片
+        function extractImages() {
+            const url = document.getElementById('urlInput').value;
+            if (!url) return alert('请输入URL');
+            
+            fetch('/api/extract_images', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({url})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.images) {
+                    const preview = document.getElementById('imagePreview');
+                    preview.innerHTML = '';
+                    data.images.forEach(src => {
+                        const img = document.createElement('img');
+                        img.src = src;
+                        preview.appendChild(img);
+                    });
+                }
+            });
+        }
+        
+        // 生成视频
+        function generateVideo() {
+            const files = document.getElementById('imageFiles').files;
+            const text = document.getElementById('scriptText').value;
+            const duration = document.getElementById('duration').value;
+            
+            if (files.length === 0) {
+                alert('请上传图片');
+                return;
+            }
+            
+            const btn = document.getElementById('generateBtn');
+            btn.disabled = true;
+            btn.textContent = '生成中...';
+            
+            // 创建 FormData
+            const formData = new FormData();
+            Array.from(files).forEach(f => formData.append('images', f));
+            formData.append('text', text);
+            formData.append('duration', duration);
+            
+            fetch('/api/generate_upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.video) {
+                    document.getElementById('resultCard').style.display = 'block';
+                    document.getElementById('videoPreview').innerHTML = 
+                        `<video controls src="${data.video}"></video>`;
+                } else {
+                    alert(data.error || '生成失败');
+                }
+            })
+            .catch(err => alert('Error: ' + err.message))
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = '🎬 生成视频';
+            });
+        }
+    </script>
+</body>
+</html>
